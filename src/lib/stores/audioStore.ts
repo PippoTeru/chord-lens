@@ -64,7 +64,7 @@ export function getAudioEngine(): AudioEngine {
 /**
  * AudioEngine初期化
  */
-export async function initializeAudio(sf2Url: string = '/SalamanderGrandPiano-V3+20200602.sf2') {
+export async function initializeAudio(sf2Url: string = 'https://pub-50ca9c7c99bd45e3a932d181bfe5c961.r2.dev/SalamanderGrandPiano-V3+20200602.sf2') {
   const engine = getAudioEngine();
 
   audioState.update((state) => ({ ...state, isLoading: true, error: null, loadingProgress: 0 }));
