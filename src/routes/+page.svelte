@@ -2,11 +2,27 @@
 	import Piano from "$lib/components/Piano.svelte";
 	import Settings from "$lib/components/Settings.svelte";
 	import ChordDisplay from "$lib/components/ChordDisplay.svelte";
-	import { audioState } from "$lib/stores/audioStore";
+	import SF2Selector from "$lib/components/SF2Selector.svelte";
+	import { audioState, initializeAudio } from "$lib/stores/audioStore";
 	import { isDarkMode } from "$lib/stores/settingsStore";
+
+	let showSF2Selector = $state(true);
+	let sf2Selected = $state(false);
+
+	function handleSF2Select(url: string) {
+		showSF2Selector = false;
+		sf2Selected = true;
+		// SF2を読み込んで初期化
+		initializeAudio(url);
+	}
 </script>
 
 <div class="app-container">
+	<!-- SF2選択ダイアログ -->
+	{#if showSF2Selector}
+		<SF2Selector onSelect={handleSF2Select} />
+	{/if}
+
 	<!-- 上部エリア（設定パネルとコード表示） -->
 	<div class="content-area" class:dark={$isDarkMode}>
 		{#if $audioState.error}

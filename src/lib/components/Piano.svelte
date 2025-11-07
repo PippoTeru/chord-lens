@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { audioState, activeKeys, sustainPedalDown, initializeAudio } from '$lib/stores/audioStore';
+	import { activeKeys, sustainPedalDown } from '$lib/stores/audioStore';
 	import { settings } from '$lib/stores/settingsStore';
 
 	// ========================================
@@ -340,11 +340,11 @@
 	// ========================================
 
 	/**
-	 * コンポーネント初期化時にAudioEngineを起動
+	 * コンポーネント初期化時（SF2は+page.svelteで選択後に初期化される）
 	 */
 	onMount(async () => {
-		console.log('🎹 Piano component mounted, initializing audio...');
-		await initializeAudio();
+		console.log('🎹 Piano component mounted');
+		// initializeAudio()は+page.svelteのSF2選択後に呼ばれる
 	});
 
 	/**

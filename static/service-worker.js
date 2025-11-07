@@ -1,8 +1,11 @@
 // ChordLens Service Worker
 // SF2ファイルをキャッシュして高速化
 
-const CACHE_NAME = 'chord-lens-v1';
-const SF2_URL = 'https://pub-50ca9c7c99bd45e3a932d181bfe5c961.r2.dev/SalamanderGrandPiano-V3+20200602.sf2';
+const CACHE_NAME = 'chord-lens-v2';
+const SF2_URLS = [
+  'https://pub-50ca9c7c99bd45e3a932d181bfe5c961.r2.dev/SalamanderGrandPiano-V3+20200602.sf2',
+  'https://pub-50ca9c7c99bd45e3a932d181bfe5c961.r2.dev/YAMAHA_DX7Piano.SF2'
+];
 
 // インストール時
 self.addEventListener('install', (event) => {
@@ -36,7 +39,9 @@ self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
   // SF2ファイルのリクエストをキャッシュ
-  if (url === SF2_URL) {
+  const isSF2Request = SF2_URLS.some(sf2Url => url.includes(sf2Url) || url.endsWith('.SF2') || url.endsWith('.sf2'));
+
+  if (isSF2Request) {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) => {
         return cache.match(event.request).then((cachedResponse) => {
