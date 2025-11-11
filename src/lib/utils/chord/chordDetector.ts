@@ -4,110 +4,123 @@
 import { getStandardChordMap, chord2num, num2chord, getNum2Chord, type ChordMap } from './chordMaps';
 import { generateChordList, generateChordListWithOmit } from './chordGenerator';
 import { selectBestChordName, groupCandidatesByScore } from './chordScoring';
-import { mergeParentheses, convertToMNotoSans } from './mNotoConverter';
-import { settings } from '$lib/stores/settings.svelte';
+import { mergeParentheses } from '../notation/mNotoConverter';
+import type { AccidentalNotation } from '$lib/stores';
 
-// 生成されたコードマップをキャッシュ
-let generatedChordMap: ChordMap | null = null;
-let generatedChordMapWithOmit: ChordMap | null = null;
+// 生成されたコードマップ（モジュール読み込み時に即座に生成）
+// Eager initialization: 初回コード検出の遅延を排除
+const generatedChordMap: ChordMap = generateChordList();
+const generatedChordMapWithOmit: ChordMap = generateChordListWithOmit();
 
 /**
- * MIDI番号のセットからコード名を検出（通常形式）
- * テスト用：MNoto Sans変換前の通常形式を返す（括弧統合なし）
+ * コード検出オプション
  */
-export function detectChordRaw(midiNumbers: Set<number>): string {
-  if (midiNumbers.size === 0) return "";
+export interface ChordDetectionOptions {
+	/**
+	 * 臨時記号表記（'sharp' または 'flat'）
+	 * デフォルト: 'sharp'
+	 */
+	accidentalNotation?: AccidentalNotation;
 
-  // 1. MIDI番号をソートして、最低音を取得
-  const sortedMidi = Array.from(midiNumbers).sort((a, b) => a - b);
-  const lowestMidi = sortedMidi[0];
-  const lowestNoteName = num2chord[lowestMidi % 12];
+	/**
+	 * 複数候補を返すかどうか
+	 * true: 同じスコアの候補を全て返す
+	 * false: 第1候補のみ返す
+	 * デフォルト: false
+	 */
+	returnAll?: boolean;
 
-  // 2. ピッチクラスに正規化（ソート）
-  const pitchClasses = normalizeToPitchClasses(midiNumbers);
-
-  // 3. コード検出（通常形式）
-  const candidates = findChordCandidates(pitchClasses, lowestNoteName);
-
-  if (candidates.length === 0) {
-    return ""; // コードが見つからない場合は何も表示しない
-  }
-
-  // 4. スコアリング（通常形式）
-  let bestChords = selectBestChordName(candidates);
-
-  // テスト用：括弧統合なし、かつ全ての(-5)の括弧を外す
-  let result = bestChords[0];
-  // 元の実装に合わせて、(-5) → -5 に変換
-  result = result.replace(/\(-5\)/g, '-5');
-  return result;
+	/**
+	 * 括弧統合を行うかどうか
+	 * true: (9)(13) → (9, 13) のように統合する
+	 * false: 括弧統合を行わない
+	 * デフォルト: true
+	 */
+	mergeParenthesesEnabled?: boolean;
 }
 
 /**
- * MIDI番号のセットからコード名を検出（候補を複数返す）
- * スコアが同じものは全て列挙する
+ * MIDI番号のセットからコード名を検出（統合版）
+ *
+ * @param midiNumbers - MIDI番号のSet
+ * @param options - 検出オプション
+ * @returns 検出されたコード名（returnAll=trueの場合は配列、falseの場合は文字列）
  */
-export function detectChordWithCandidates(midiNumbers: Set<number>): string[] {
-  if (midiNumbers.size === 0) return [];
+export function detectChord(
+	midiNumbers: Set<number>,
+	options: ChordDetectionOptions & { returnAll: true }
+): string[];
+export function detectChord(
+	midiNumbers: Set<number>,
+	options?: ChordDetectionOptions & { returnAll?: false }
+): string;
+export function detectChord(
+	midiNumbers: Set<number>,
+	options: ChordDetectionOptions = {}
+): string | string[] {
+	const {
+		accidentalNotation = 'sharp',
+		returnAll = false,
+		mergeParenthesesEnabled = true
+	} = options;
 
-  // 設定に応じた音名変換マップを取得
-  const useFlat = settings.accidentalNotation === 'flat';
-  const num2chordMap = getNum2Chord(useFlat);
+	// 空の場合
+	if (midiNumbers.size === 0) {
+		return returnAll ? [] : '';
+	}
 
-  // 1. MIDI番号をソートして、最低音を取得
-  const sortedMidi = Array.from(midiNumbers).sort((a, b) => a - b);
-  const lowestMidi = sortedMidi[0];
-  const lowestNoteName = num2chordMap[lowestMidi % 12];
+	// 設定に応じた音名変換マップを取得
+	const useFlat = accidentalNotation === 'flat';
+	const num2chordMap = getNum2Chord(useFlat);
 
-  // 2. ピッチクラスに正規化（ソート）
-  const pitchClasses = normalizeToPitchClasses(midiNumbers, num2chordMap);
+	// 1. MIDI番号をソートして、最低音を取得
+	const sortedMidi = Array.from(midiNumbers).sort((a, b) => a - b);
+	const lowestMidi = sortedMidi[0];
+	const lowestNoteName = num2chordMap[lowestMidi % 12];
 
-  // 1音の場合は何も表示しない
-  if (pitchClasses.length === 1) {
-    return [];
-  }
+	// 2. ピッチクラスに正規化（ソート）
+	const pitchClasses = normalizeToPitchClasses(midiNumbers, num2chordMap);
 
-  // 2音の場合はパワーコード（5th）のみ表示
-  if (pitchClasses.length === 2) {
-    const intervals = toIntervals(pitchClasses);
-    // パワーコード (0,7) のみ表示、それ以外は空文字
-    if (intervals.join(',') === '0,7') {
-      const chord = pitchClasses[0] + '5';
-      return [convertToMNotoSans(chord)];
-    }
-    return []; // パワーコード以外は表示しない
-  }
+	// 1音の場合は何も表示しない
+	if (pitchClasses.length === 1) {
+		return returnAll ? [] : '';
+	}
 
-  // 3. コード検出（通常形式）
-  const candidates = findChordCandidates(pitchClasses, lowestNoteName);
+	// 2音の場合はパワーコード（5th）のみ表示
+	if (pitchClasses.length === 2) {
+		const intervals = toIntervals(pitchClasses);
+		// パワーコード (0,7) のみ表示、それ以外は空文字
+		if (intervals.join(',') === '0,7') {
+			const chord = pitchClasses[0] + '5';
+			return returnAll ? [chord] : chord;
+		}
+		return returnAll ? [] : '';
+	}
 
-  if (candidates.length === 0) {
-    return []; // コードが見つからない場合は何も表示しない
-  }
+	// 3. コード検出
+	const candidates = findChordCandidates(pitchClasses, lowestNoteName);
 
-  // 4. スコアリング（スコアごとにグループ化）
-  const groups = groupCandidatesByScore(candidates);
+	if (candidates.length === 0) {
+		return returnAll ? [] : '';
+	}
 
-  // 5. 第1位のグループのみ処理（括弧統合 & MNoto Sans変換）
-  const result: string[] = [];
-  if (groups.length > 0) {
-    const topGroup = groups[0];
-    for (const chordName of topGroup) {
-      const mergedChord = mergeParentheses(chordName);
-      const mNotoChord = convertToMNotoSans(mergedChord);
-      result.push(mNotoChord);
-    }
-  }
+	// 4. スコアリング（スコアごとにグループ化）
+	const groups = groupCandidatesByScore(candidates);
 
-  return result;
-}
+	// 5. 第1位のグループのみ処理（括弧統合オプション）
+	const result: string[] = [];
+	if (groups.length > 0) {
+		const topGroup = groups[0];
+		for (const chordName of topGroup) {
+			const processedChord = mergeParenthesesEnabled
+				? mergeParentheses(chordName)
+				: chordName;
+			result.push(processedChord);
+		}
+	}
 
-/**
- * MIDI番号のセットからコード名を検出（第1候補のみ）
- */
-export function detectChord(midiNumbers: Set<number>): string {
-  const candidates = detectChordWithCandidates(midiNumbers);
-  return candidates.length > 0 ? candidates[0] : "";
+	// 6. returnAllオプションに応じて返す
+	return returnAll ? result : (result.length > 0 ? result[0] : '');
 }
 
 /**
@@ -152,53 +165,77 @@ function findChordCandidates(pitchClasses: string[], lowestNoteName: string): st
   const candidates: string[] = [];
 
   // 3種類のマップで検索（元の実装に合わせてstandard → generated1 → generated2の順）
-  const standardMap = getStandardChordMap();
-  const generatedMap = getGeneratedChordMap();
-  const generatedMapWithOmit = getGeneratedChordMapWithOmit();
-
   const maps: [ChordMap, string][] = [
-    [standardMap, 'standard'],
-    [generatedMap, 'generated1'],
-    [generatedMapWithOmit, 'generated2'],
+    [getStandardChordMap(), 'standard'],
+    [getGeneratedChordMap(), 'generated1'],
+    [getGeneratedChordMapWithOmit(), 'generated2'],
   ];
 
   for (const [chordMap, mapType] of maps) {
-    // 1. そのまま検索（判定）
-    const r1 = find(pitchClasses, chordMap);
-    if (r1 !== null) {
-      const results = Array.isArray(r1) ? r1 : [r1];
-      candidates.push(...results);
-    }
+    // 1. 直接マッチ検索
+    searchDirectMatch(pitchClasses, chordMap, candidates);
 
-    // 2. ベース音をとって転回判定
-    // if(true || res == null || map_type == "generated2")
-    if (true) {
-      const tmpChordAry = pitchClasses.slice(1); // shift相当
+    // 2. ベース音除去検索
+    searchWithBassRemoved(pitchClasses, lowestNoteName, chordMap, candidates);
 
-      // 2-1. ベース音を除いて検索
-      const r2 = find(tmpChordAry, chordMap);
-      if (r2 !== null) {
-        const results = Array.isArray(r2) ? r2 : [r2];
-        for (const chord of results) {
-          candidates.push(createSlashChord(chord, lowestNoteName));
-        }
-      }
-
-      // 2-2. ベース音を除いて回転検索
-      const r3 = findWithRotate(tmpChordAry, lowestNoteName, chordMap);
-      candidates.push(...r3);
-    }
-
-    // 3. ベース音ありで転回判定
-    // if(true || res == null || map_type == "generated2")
-    if (true) {
-      const r4 = findWithRotate(pitchClasses, lowestNoteName, chordMap);
-      candidates.push(...r4);
-    }
+    // 3. 転回形検索
+    searchInversions(pitchClasses, lowestNoteName, chordMap, candidates);
   }
 
   // 重複除去
   return Array.from(new Set(candidates));
+}
+
+/**
+ * 直接マッチ検索
+ * ピッチクラスをそのまま検索
+ */
+function searchDirectMatch(pitchClasses: string[], chordMap: ChordMap, candidates: string[]): void {
+  const result = find(pitchClasses, chordMap);
+  if (result !== null) {
+    const chords = Array.isArray(result) ? result : [result];
+    candidates.push(...chords);
+  }
+}
+
+/**
+ * ベース音除去検索
+ * ベース音を除いた音でコードを検索し、スラッシュコードとして追加
+ */
+function searchWithBassRemoved(
+  pitchClasses: string[],
+  lowestNoteName: string,
+  chordMap: ChordMap,
+  candidates: string[]
+): void {
+  const withoutBass = pitchClasses.slice(1); // ベース音を除去
+
+  // ベース音を除いて直接検索
+  const directResult = find(withoutBass, chordMap);
+  if (directResult !== null) {
+    const chords = Array.isArray(directResult) ? directResult : [directResult];
+    for (const chord of chords) {
+      candidates.push(createSlashChord(chord, lowestNoteName));
+    }
+  }
+
+  // ベース音を除いて転回形検索
+  const rotateResults = findWithRotate(withoutBass, lowestNoteName, chordMap);
+  candidates.push(...rotateResults);
+}
+
+/**
+ * 転回形検索
+ * ピッチクラスを回転させながら検索
+ */
+function searchInversions(
+  pitchClasses: string[],
+  lowestNoteName: string,
+  chordMap: ChordMap,
+  candidates: string[]
+): void {
+  const rotateResults = findWithRotate(pitchClasses, lowestNoteName, chordMap);
+  candidates.push(...rotateResults);
 }
 
 /**
@@ -283,21 +320,15 @@ function toIntervals(noteNames: string[]): number[] {
 }
 
 /**
- * 生成されたコードマップを取得（キャッシュ付き、omitなし）
+ * 生成されたコードマップを取得（omitなし）
  */
 function getGeneratedChordMap(): ChordMap {
-  if (!generatedChordMap) {
-    generatedChordMap = generateChordList();
-  }
   return generatedChordMap;
 }
 
 /**
- * 生成されたコードマップを取得（キャッシュ付き、omitあり）
+ * 生成されたコードマップを取得（omitあり）
  */
 function getGeneratedChordMapWithOmit(): ChordMap {
-  if (!generatedChordMapWithOmit) {
-    generatedChordMapWithOmit = generateChordListWithOmit();
-  }
   return generatedChordMapWithOmit;
 }

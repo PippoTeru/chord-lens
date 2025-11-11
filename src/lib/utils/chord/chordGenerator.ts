@@ -36,9 +36,9 @@ function generateChordListInternal(includeOmit: boolean): ChordMap {
 
   const fifth_ary: ChordEntry[] = [
     [null, "(omit5)"],
-    [6, "(-5)"],
+    [6, "(♭5)"],
     [7, ""],
-    [8, "(+5)"],
+    [8, "(♯5)"],
   ];
 
   const seventh_ary: ChordEntry[] = [
@@ -49,14 +49,14 @@ function generateChordListInternal(includeOmit: boolean): ChordMap {
   ];
 
   const tension_ary: ChordEntry[] = [
-    [1, "(-9)"],
+    [1, "(♭9)"],
     [2, "(9)", [[/7/, "9"]]],              // 7 → 9 置き換え
-    [3, "(+9)"],
+    [3, "(♯9)"],
     [5, "(11)", [[/9(?!\))/, "11"]]],      // 9 → 11 置き換え（括弧付きでない9）
-    [6, "(+11)"],
-    [8, "(-13)"],
+    [6, "(♯11)"],
+    [8, "(♭13)"],
     [9, "(13)", [[/11(?!\))/, "13"]]],     // 11 → 13 置き換え（括弧付きでない11）
-    [10, "(+13)"],
+    [10, "(♯13)"],
   ];
 
   // Step 1: 基本コードの生成
@@ -82,6 +82,10 @@ function generateChordListInternal(includeOmit: boolean): ChordMap {
 
   for (const [intervals, name] of tmp_ary) {
     if (!intervals) {
+      continue;
+    }
+    // 配列かどうかチェック
+    if (!Array.isArray(intervals)) {
       continue;
     }
     if (intervals.length === 0) {
@@ -135,99 +139,109 @@ function generateChordListInternal(includeOmit: boolean): ChordMap {
 }
 
 /**
- * 2つの配列の直積を計算し、置き換えルールを適用
+ * インターバル配列を結合（重複チェック付き）
+ *
+ * @param e1 - 第1のインターバル（数値、配列、またはnull）
+ * @param e2 - 第2のインターバル（数値、配列、またはnull）
+ * @returns 結合されたインターバル配列と重複フラグ
+ */
+function combineIntervals(
+  e1: number | number[] | null,
+  e2: number | number[] | null
+): { intervals: number[]; hasDuplicate: boolean } {
+  const intervals: number[] = [];
+  let hasDuplicate = false;
+
+  [e1, e2].forEach((e) => {
+    if (e == null) {
+      // nullはスキップ
+      return;
+    }
+
+    const values = Array.isArray(e) ? e : [e];
+    for (const num of values) {
+      if (intervals.indexOf(num) >= 0) {
+        hasDuplicate = true;
+      } else {
+        intervals.push(num);
+      }
+    }
+  });
+
+  // インターバルをソート
+  intervals.sort((a, b) => a - b);
+
+  return { intervals, hasDuplicate };
+}
+
+/**
+ * 置き換えルールを適用
+ *
+ * @param name - 元のコード名
+ * @param intervals - インターバル配列
+ * @param rules - 置き換えルール（オプション）
+ * @returns 適用結果のChordEntry配列
+ */
+function applyReplacementRules(
+  name: string,
+  intervals: number[] | null,
+  rules?: ReplacementRule[]
+): ChordEntry[] {
+  const results: ChordEntry[] = [[intervals, name]];
+
+  if (!rules) {
+    return results;
+  }
+
+  for (const [regex, replacement] of rules) {
+    if (regex.test(name)) {
+      const newName = name.replace(regex, replacement);
+      if (newName !== name) {
+        results.push([intervals, newName]);
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * 2つの配列の直積を計算（リファクタリング版）
+ *
+ * ChordEntry配列の直積を計算し、重複チェックと置き換えルールを適用
+ *
+ * @param ary1 - 第1のChordEntry配列
+ * @param ary2 - 第2のChordEntry配列
+ * @returns 直積結果のChordEntry配列
  */
 function productArray(ary1: ChordEntry[], ary2: ChordEntry[]): ChordEntry[] {
   const res: ChordEntry[] = [];
 
   for (const e1 of ary1) {
     for (const e2 of ary2) {
-      // 半音数配列の結合（元の実装に合わせて）
-      const ary: number[] = [];
-      let hasDuplicate = false;
-
-      [e1[0], e2[0]].forEach((e) => {
-        if (e == null) {
-          // nullはスキップ
-        } else if (Array.isArray(e)) {
-          // 配列の場合、各要素を追加
-          for (const num of e) {
-            if (ary.indexOf(num) >= 0) {
-              hasDuplicate = true;
-            } else {
-              ary.push(num);
-            }
-          }
-        } else {
-          // 数値の場合
-          if (ary.indexOf(e) >= 0) {
-            hasDuplicate = true;
-          } else {
-            ary.push(e);
-          }
-        }
-      });
+      // インターバル配列を結合
+      const { intervals, hasDuplicate } = combineIntervals(e1[0], e2[0]);
 
       // 重複がある場合はスキップ
       if (hasDuplicate) {
         continue;
       }
 
-      // インターバルをソート
-      ary.sort((a, b) => a - b);
-
-      // 表記の結合
+      // コード名を結合
       const name = e1[1] + e2[1];
-      res.push([ary.length > 0 ? ary : null, name]);
 
-      // 置き換えルールの適用（結合後の文字列全体に対して）
-      if (e2[2]) {
-        for (const [regex, replacement] of e2[2]) {
-          // まず結合後の文字列にマッチするか確認
-          if (regex.test(name)) {
-            const newName = name.replace(regex, replacement);
-            if (newName !== name) {
-              res.push([ary.length > 0 ? ary : null, newName]);
-            }
-          }
-        }
-      }
+      // インターバルをnullまたは配列として格納
+      const intervalsOrNull = intervals.length > 0 ? intervals : null;
+
+      // 置き換えルールを適用して結果を追加
+      const entries = applyReplacementRules(name, intervalsOrNull, e2[2]);
+      res.push(...entries);
     }
   }
 
   return res;
 }
 
-/**
- * インターバル配列を結合（重複チェック付き）
- */
-function combineIntervals(arr1: number | number[] | null, arr2: number | number[] | null): number[] | null {
-  if (!arr1 && !arr2) return null;
-  if (!arr1) {
-    return Array.isArray(arr2) ? arr2 : [arr2 as number];
-  }
-  if (!arr2) {
-    return Array.isArray(arr1) ? arr1 : [arr1 as number];
-  }
-
-  const combined: number[] = [];
-
-  // arr1の要素を追加
-  if (Array.isArray(arr1)) {
-    combined.push(...arr1);
-  } else {
-    combined.push(arr1);
-  }
-
-  // arr2の要素を追加
-  if (Array.isArray(arr2)) {
-    combined.push(...arr2);
-  } else {
-    combined.push(arr2);
-  }
-
-  return combined.sort((a, b) => a - b);
-}
 
 /**
  * 重複チェック

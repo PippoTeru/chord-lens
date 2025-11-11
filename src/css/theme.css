@@ -1,0 +1,102 @@
+/**
+ * テーマCSS変数定義
+ * ライトモード・ダークモード統一
+ */
+
+:root {
+	/* ========================================
+	 * ライトモードの色定義
+	 * ======================================== */
+
+	/* 背景色 */
+	--bg-primary: #f5f5f5;
+	--bg-secondary: #ffffff;
+	--bg-tertiary: #e0e0e0;
+
+	/* テキスト色 */
+	--text-primary: #333333;
+	--text-secondary: #666666;
+	--text-tertiary: #999999;
+
+	/* ボーダー色 */
+	--border-primary: #ddd;
+	--border-secondary: #ccc;
+	--border-tertiary: #000000;
+
+	/* アクセント色 */
+	--accent-primary: #4caf50;
+	--accent-hover: #45a049;
+
+	/* 状態色 */
+	--state-active: #888888;
+
+	/* シャドウ */
+	--shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+	--shadow-md: 0 4px 8px rgba(0, 0, 0, 0.15);
+	--shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+	/* 通知レベル色（ライトモード） */
+	--notification-info-border: #2196f3;
+	--notification-warning-border: #ff9800;
+	--notification-error-border: #f44336;
+	--notification-critical-border: #d32f2f;
+	--notification-critical-bg: #ffebee;
+}
+
+/* ========================================
+ * ダークモードの色定義
+ * ======================================== */
+.dark {
+	/* 背景色 */
+	--bg-primary: #1a1a1a;
+	--bg-secondary: #2d2d2d;
+	--bg-tertiary: #3a3a3a;
+
+	/* テキスト色 */
+	--text-primary: #e0e0e0;
+	--text-secondary: #999999;
+	--text-tertiary: #666666;
+
+	/* ボーダー色 */
+	--border-primary: #555;
+	--border-secondary: #444;
+	--border-tertiary: #000000;
+
+	/* アクセント色（ダークモードでも同じ） */
+	--accent-primary: #4caf50;
+	--accent-hover: #45a049;
+
+	/* 状態色 */
+	--state-active: #888888;
+
+	/* シャドウ */
+	--shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+	--shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+	--shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+	/* 通知レベル色（ダークモード） */
+	--notification-info-border: #64b5f6;
+	--notification-warning-border: #ffb74d;
+	--notification-error-border: #e57373;
+	--notification-critical-border: #ef5350;
+	--notification-critical-bg: #3a1a1a;
+}
+
+/* ========================================
+ * トランジション
+ * ======================================== */
+:root {
+	--transition-fast: 0.2s ease;
+	--transition-normal: 0.3s ease;
+	--transition-slow: 0.5s ease;
+}
+
+/* ========================================
+ * Z-index階層
+ * ======================================== */
+:root {
+	--z-overlay: 1000;
+	--z-panel: 1001;
+	--z-settings-button: 1002;
+	--z-notification: 2000;
+}

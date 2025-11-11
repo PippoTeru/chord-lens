@@ -1,7 +1,9 @@
 // 標準コードマップ
 // chord-detection-spec-v3.md に基づく実装
 
-export type ChordMap = Record<string, string>;
+import type { ChordMap, Num2ChordMap, Chord2NumMap } from '$lib/types';
+
+export type { ChordMap };
 
 /**
  * 標準コードマップを取得
@@ -67,52 +69,66 @@ export function getStandardChordMap(): ChordMap {
 /**
  * 音名 → 半音数の変換テーブル
  */
-export const chord2num: Record<string, number> = {
+export const chord2num: Chord2NumMap = {
   "c": 0,
   "b#": 0,
+  "b♯": 0,
   "c#": 1,
+  "c♯": 1,
+  "db": 1,  // 'b'表記（ディグリー表記のトニック用）
   "d♭": 1,
   "d": 2,
   "d#": 3,
+  "d♯": 3,
+  "eb": 3,  // 'b'表記（ディグリー表記のトニック用）
   "e♭": 3,
   "e": 4,
+  "fb": 4,  // 'b'表記
   "f♭": 4,
   "e#": 5,
+  "e♯": 5,
   "f": 5,
   "f#": 6,
+  "f♯": 6,
+  "gb": 6,  // 'b'表記（ディグリー表記のトニック用）
   "g♭": 6,
   "g": 7,
   "g#": 8,
+  "g♯": 8,
+  "ab": 8,  // 'b'表記（ディグリー表記のトニック用）
   "a♭": 8,
   "a": 9,
   "a#": 10,
+  "a♯": 10,
+  "bb": 10, // 'b'表記（ディグリー表記のトニック用）
   "b♭": 10,
   "b": 11,
+  "cb": 11, // 'b'表記
   "c♭": 11,
 };
 
 /**
- * 半音数 → 音名の変換テーブル（#統一）
+ * 半音数 → 音名の変換テーブル（♯統一、Unicode U+266F）
  */
-export const num2chord: Record<number, string> = {
+export const num2chord: Num2ChordMap = {
   0: "C",
-  1: "C#",
+  1: "C♯",
   2: "D",
-  3: "D#",
+  3: "D♯",
   4: "E",
   5: "F",
-  6: "F#",
+  6: "F♯",
   7: "G",
-  8: "G#",
+  8: "G♯",
   9: "A",
-  10: "A#",
+  10: "A♯",
   11: "B",
 };
 
 /**
  * 半音数 → 音名の変換テーブル（♭統一）
  */
-export const num2chordFlat: Record<number, string> = {
+export const num2chordFlat: Num2ChordMap = {
   0: "C",
   1: "D♭",
   2: "D",
@@ -130,6 +146,6 @@ export const num2chordFlat: Record<number, string> = {
 /**
  * 設定に応じた音名変換テーブルを取得
  */
-export function getNum2Chord(useFlat: boolean): Record<number, string> {
+export function getNum2Chord(useFlat: boolean): Num2ChordMap {
   return useFlat ? num2chordFlat : num2chord;
 }

@@ -6,6 +6,7 @@
  * - Note On/Off処理
  * - Control Change（サステインペダル等）
  * - イベントリスナー管理
+ * - 依存性注入によるテスタビリティ
  */
 
 import type {
@@ -17,7 +18,9 @@ import type {
   MIDIControlChangeEvent,
   MIDIInputInfo,
   MIDIState,
-} from '$lib/types/midi.types';
+} from '$lib/types';
+import { notificationStore } from '$lib/stores';
+import { BrowserMIDIProvider, type IMIDIProvider, type IMIDIAccess } from './IMIDIProvider';
 
 /**
  * MIDIManager設定
@@ -28,29 +31,32 @@ export interface MIDIManagerConfig {
 }
 
 /**
- * MIDI入力管理クラス
+ * MIDI入力管理クラス（依存性注入対応）
  */
 export class MIDIManager {
-  private midiAccess: MIDIAccess | null = null;
+  private midiAccess: IMIDIAccess | null = null;
   private listeners: Map<MIDIEventType, Set<MIDIEventHandler>> = new Map();
   private isInitialized = false;
   private activeInputs: Map<string, MIDIInput> = new Map();
   private selectedDeviceId: string | null = null; // null = All Devices
   private activeNotes = new Set<number>(); // 現在ONになっているノート番号（バウンシング対策）
+  private midiProvider: IMIDIProvider;
+
+  /**
+   * コンストラクタ
+   * @param midiProvider - MIDIプロバイダー（デフォルト: BrowserMIDIProvider）
+   */
+  constructor(midiProvider: IMIDIProvider = new BrowserMIDIProvider()) {
+    this.midiProvider = midiProvider;
+  }
 
   /**
    * 初期化
    */
   async initialize(config: MIDIManagerConfig = {}): Promise<boolean> {
-    // Web MIDI API対応チェック
-    if (!navigator.requestMIDIAccess) {
-      console.error('Web MIDI API is not supported in this browser');
-      return false;
-    }
-
     try {
-      // MIDIアクセス要求
-      this.midiAccess = await navigator.requestMIDIAccess({
+      // MIDIアクセス要求（プロバイダー経由）
+      this.midiAccess = await this.midiProvider.requestMIDIAccess({
         sysex: config.sysex || false,
         software: config.software !== false,
       });
@@ -59,16 +65,37 @@ export class MIDIManager {
       this.connectInputs();
 
       // デバイス変更を監視
-      this.midiAccess.onstatechange = (event) => {
-        console.log('MIDI device state changed:', event);
+      this.midiAccess.onstatechange = () => {
         this.connectInputs();
       };
 
       this.isInitialized = true;
-      console.log('✅ MIDIManager initialized');
+
+      // デバイス検出を確認
+      const devices = this.getDevices();
+      if (devices.length === 0) {
+        notificationStore.warning('MIDIデバイスが検出されませんでした。デバイスを接続してください。');
+      } else {
+        notificationStore.info(`${devices.length}個のMIDIデバイスを検出しました。`);
+      }
+
       return true;
     } catch (error) {
       console.error('Failed to initialize MIDI:', error);
+
+      // エラーメッセージを詳細化
+      if (error instanceof Error) {
+        if (error.message.includes('not supported')) {
+          notificationStore.error(
+            'Web MIDI APIがサポートされていません。Chrome、Edge、Operaなどのブラウザをご利用ください。'
+          );
+        } else {
+          notificationStore.error(`MIDI初期化に失敗しました: ${error.message}`);
+        }
+      } else {
+        notificationStore.error('MIDI初期化に失敗しました。ブラウザの設定を確認してください。');
+      }
+
       return false;
     }
   }
@@ -90,12 +117,7 @@ export class MIDIManager {
       if (input.state === 'connected') {
         input.onmidimessage = (event) => this.handleMIDIMessage(event);
         this.activeInputs.set(input.id, input);
-        console.log(`Connected MIDI input: ${input.name} (${input.manufacturer})`);
       }
-    }
-
-    if (this.activeInputs.size === 0) {
-      console.warn('No MIDI input devices found');
     }
   }
 
@@ -112,29 +134,41 @@ export class MIDIManager {
     }
 
     const data = event.data;
+    if (!data || data.length < 1) return;
+
     const status = data[0];
     const statusByte = status & 0xf0; // 上位4ビット（コマンド）
     const channel = status & 0x0f; // 下位4ビット（チャンネル）
 
     switch (statusByte) {
       case 0x90: // Note On
-        this.handleNoteOn(data[1], data[2], channel, event.timeStamp);
+        if (data.length >= 3) {
+          this.handleNoteOn(data[1], data[2], channel, event.timeStamp);
+        }
         break;
 
       case 0x80: // Note Off
-        this.handleNoteOff(data[1], data[2], channel, event.timeStamp);
+        if (data.length >= 3) {
+          this.handleNoteOff(data[1], data[2], channel, event.timeStamp);
+        }
         break;
 
       case 0xb0: // Control Change
-        this.handleControlChange(data[1], data[2], channel, event.timeStamp);
+        if (data.length >= 3) {
+          this.handleControlChange(data[1], data[2], channel, event.timeStamp);
+        }
         break;
 
       case 0xe0: // Pitch Bend
-        this.handlePitchBend(data[1], data[2], channel, event.timeStamp);
+        if (data.length >= 3) {
+          this.handlePitchBend(data[1], data[2], channel, event.timeStamp);
+        }
         break;
 
       case 0xc0: // Program Change
-        this.handleProgramChange(data[1], channel, event.timeStamp);
+        if (data.length >= 2) {
+          this.handleProgramChange(data[1], channel, event.timeStamp);
+        }
         break;
 
       default:
@@ -155,7 +189,6 @@ export class MIDIManager {
 
     // バウンシング対策: NOTE OFFが来ていない状態での重複NOTE ONを無視
     if (this.activeNotes.has(note)) {
-      console.warn(`[MIDIManager] Duplicate NOTE ON for note ${note}, ignoring (bouncing prevention)`);
       return;
     }
 
