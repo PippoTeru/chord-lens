@@ -57,83 +57,91 @@
 	<!-- コンテンツ -->
 	<div class="content">
 		<div class="controls">
-			<!-- トランスポーズ -->
-			<div class="control-row">
-				<label for="transpose">Transpose: <span class="transpose-value-inline">{settingsStore.transpose > 0 ? '+' : ''}{settingsStore.transpose}</span></label>
-				<div class="transpose-controls">
-					<button
-						class="transpose-button"
-						onclick={() => settingsStore.setTranspose(settingsStore.transpose - 1)}
-						disabled={settingsStore.transpose <= -11}
-						aria-label="Transpose down"
-					>
-						−
-					</button>
-					<input
-						type="range"
-						id="transpose"
-						min="-11"
-						max="11"
-						step="1"
-						value={settingsStore.transpose}
-						oninput={(e) => settingsStore.setTranspose(Number(e.currentTarget.value))}
-						class="transpose-slider"
-					/>
-					<button
-						class="transpose-button"
-						onclick={() => settingsStore.setTranspose(settingsStore.transpose + 1)}
-						disabled={settingsStore.transpose >= 11}
-						aria-label="Transpose up"
-					>
-						+
-					</button>
-				</div>
-			</div>
+			<!-- Basic Settings Section -->
+			<div class="section">
+				<h4 class="section-title">Basic</h4>
 
-			<!-- 臨時記号表記 -->
-			<div class="control-row">
-				<label for="accidental-notation-panel">Accidentals</label>
-				<CustomDropdown
-					bind:value={settingsStore.accidentalNotation}
-					options={accidentalOptions}
-					onchange={(value) => settingsStore.setAccidentalNotation(value as AccidentalNotation)}
-				/>
-			</div>
-
-			<!-- ディグリー表記ON/OFF -->
-			<div class="control-row checkbox">
-				<label>
-					<input
-						type="checkbox"
-						checked={settingsStore.showDegreeNotation}
-						onchange={() => settingsStore.toggleDegreeNotation()}
-					/>
-					Degree Notation
-				</label>
-			</div>
-
-			{#if settingsStore.showDegreeNotation}
-				<!-- 主音選択 -->
+				<!-- トランスポーズ -->
 				<div class="control-row">
-					<label for="tonic-note-panel">Tonic</label>
-					<CustomDropdown
-						bind:value={settingsStore.selectedTonic}
-						options={TONIC_NOTES}
-						onchange={(value) => settingsStore.setSelectedTonic(value)}
-						placeholder="None"
-					/>
+					<label for="transpose">Transpose: <span class="transpose-value-inline">{settingsStore.transpose > 0 ? '+' : ''}{settingsStore.transpose}</span></label>
+					<div class="transpose-controls">
+						<button
+							class="transpose-button"
+							onclick={() => settingsStore.setTranspose(settingsStore.transpose - 1)}
+							disabled={settingsStore.transpose <= -11}
+							aria-label="Transpose down"
+						>
+							−
+						</button>
+						<input
+							type="range"
+							id="transpose"
+							min="-11"
+							max="11"
+							step="1"
+							value={settingsStore.transpose}
+							oninput={(e) => settingsStore.setTranspose(Number(e.currentTarget.value))}
+							class="transpose-slider"
+						/>
+						<button
+							class="transpose-button"
+							onclick={() => settingsStore.setTranspose(settingsStore.transpose + 1)}
+							disabled={settingsStore.transpose >= 11}
+							aria-label="Transpose up"
+						>
+							+
+						</button>
+					</div>
 				</div>
 
-				<!-- キーモード選択 -->
+				<!-- 臨時記号表記 -->
 				<div class="control-row">
-					<label for="key-mode-panel">Mode</label>
+					<label for="accidental-notation-panel">Accidentals</label>
 					<CustomDropdown
-						bind:value={settingsStore.selectedKeyMode}
-						options={keyModeOptions}
-						onchange={(value) => settingsStore.setKeyMode(value as KeyMode)}
+						bind:value={settingsStore.accidentalNotation}
+						options={accidentalOptions}
+						onchange={(value) => settingsStore.setAccidentalNotation(value as AccidentalNotation)}
 					/>
 				</div>
-			{/if}
+			</div>
+
+			<!-- Degree Notation Section -->
+			<div class="section degree-section" class:dark={isDark}>
+				<div class="control-row checkbox">
+					<label>
+						<input
+							type="checkbox"
+							checked={settingsStore.showDegreeNotation}
+							onchange={() => settingsStore.toggleDegreeNotation()}
+						/>
+						Degree Notation
+					</label>
+				</div>
+
+				{#if settingsStore.showDegreeNotation}
+					<div class="degree-options">
+						<!-- 主音選択 -->
+						<div class="control-row">
+							<label for="tonic-note-panel">Tonic</label>
+							<CustomDropdown
+								bind:value={settingsStore.selectedTonic}
+								options={TONIC_NOTES}
+								onchange={(value) => settingsStore.setSelectedTonic(value)}
+							/>
+						</div>
+
+						<!-- キーモード選択 -->
+						<div class="control-row">
+							<label for="key-mode-panel">Mode</label>
+							<CustomDropdown
+								bind:value={settingsStore.selectedKeyMode}
+								options={keyModeOptions}
+								onchange={(value) => settingsStore.setKeyMode(value as KeyMode)}
+							/>
+						</div>
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 </div>
@@ -277,7 +285,57 @@
 	.controls {
 		display: flex;
 		flex-direction: column;
+		gap: 1rem;
+	}
+
+	/* Section Styling */
+	.section {
+		display: flex;
+		flex-direction: column;
 		gap: 0.75rem;
+	}
+
+	.section-title {
+		margin: 0 0 0.25rem 0;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	/* Degree Notation Section */
+	.degree-section {
+		padding: 1rem;
+		background: rgba(0, 0, 0, 0.03);
+		border: 1px solid var(--border-primary);
+		border-radius: 8px;
+		transition: all var(--transition-normal);
+	}
+
+	.degree-section.dark {
+		background: rgba(255, 255, 255, 0.03);
+	}
+
+	.degree-options {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-top: 0.75rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--border-primary);
+		animation: slideDown 0.2s ease-out;
+	}
+
+	@keyframes slideDown {
+		from {
+			opacity: 0;
+			transform: translateY(-8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.control-row {

@@ -38,6 +38,9 @@ interface SettingsData {
 	selectedTonic: TonicNote | null;
 	selectedKeyMode: KeyMode;
 	showDegreeNotation: boolean;
+
+	// UI状態
+	isChordNotationPanelOpen: boolean;
 }
 
 class Settings {
@@ -53,7 +56,7 @@ class Settings {
 	transpose = $state(0); // デフォルトは0（トランスポーズなし）
 
 	// ディグリー表記設定
-	selectedTonic = $state<TonicNote | null>(null);
+	selectedTonic = $state<TonicNote | null>('C');
 	selectedKeyMode = $state<KeyMode>('major');
 	showDegreeNotation = $state(false);
 
@@ -101,6 +104,8 @@ class Settings {
 				if (data.selectedKeyMode !== undefined) this.selectedKeyMode = data.selectedKeyMode;
 				if (data.showDegreeNotation !== undefined)
 					this.showDegreeNotation = data.showDegreeNotation;
+				if (data.isChordNotationPanelOpen !== undefined)
+					this.isChordNotationPanelOpen = data.isChordNotationPanelOpen;
 			}
 		} catch (error) {
 			console.error('Failed to load settings from localStorage:', error);
@@ -127,7 +132,8 @@ class Settings {
 			transpose: this.transpose,
 			selectedTonic: this.selectedTonic,
 			selectedKeyMode: this.selectedKeyMode,
-			showDegreeNotation: this.showDegreeNotation
+			showDegreeNotation: this.showDegreeNotation,
+			isChordNotationPanelOpen: this.isChordNotationPanelOpen
 		};
 
 		try {
@@ -172,14 +178,17 @@ class Settings {
 	// コード表記パネル開閉
 	openChordNotationPanel() {
 		this.isChordNotationPanelOpen = true;
+		this.saveToLocalStorage();
 	}
 
 	closeChordNotationPanel() {
 		this.isChordNotationPanelOpen = false;
+		this.saveToLocalStorage();
 	}
 
 	toggleChordNotationPanel() {
 		this.isChordNotationPanelOpen = !this.isChordNotationPanelOpen;
+		this.saveToLocalStorage();
 	}
 
 	// MIDIデバイス選択
@@ -259,7 +268,7 @@ class Settings {
 		this.highlightColor = '#888888';
 		this.accidentalNotation = 'sharp';
 		this.transpose = 0;
-		this.selectedTonic = null;
+		this.selectedTonic = 'C';
 		this.selectedKeyMode = 'major';
 		this.showDegreeNotation = false;
 		this.saveToLocalStorage();
