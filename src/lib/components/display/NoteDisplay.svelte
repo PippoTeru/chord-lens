@@ -16,18 +16,14 @@
 
 	/**
 	 * トランスポーズを適用したMIDI番号のSet
+	 * 音名表示は常にトランスポーズを適用（keyHighlightModeは鍵盤ハイライトのみに影響）
 	 */
 	let transposedMidiNumbers = $derived.by(() => {
-		// Key Highlight Modeがtransposedの場合、トランスポーズを適用
-		if (settingsStore.keyHighlightMode === 'transposed') {
-			const transposed = new Set<number>();
-			for (const midiNumber of midiStore.activeKeys) {
-				transposed.add(midiNumber + settingsStore.transpose);
-			}
-			return transposed;
+		const transposed = new Set<number>();
+		for (const midiNumber of midiStore.activeKeys) {
+			transposed.add(midiNumber + settingsStore.transpose);
 		}
-		// originalの場合はそのまま
-		return midiStore.activeKeys;
+		return transposed;
 	});
 
 	/**
